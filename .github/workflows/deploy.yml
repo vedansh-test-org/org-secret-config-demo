@@ -38,17 +38,57 @@ jobs:
           echo "CLIENT_ID_SECRET=$CLIENT_ID_SECRET" >> $GITHUB_ENV
           echo "SERVER_KEY_SECRET=$SERVER_KEY_SECRET" >> $GITHUB_ENV
 
+      - name: Generate package.xml for all metadata types
+        run: |
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > manifest/package.xml
+          echo '<Package xmlns="http://soap.sforce.com/2006/04/metadata">' >> manifest/package.xml
+
+          declare -A metadataMap=(
+            ["classes"]="ApexClass"
+            ["triggers"]="ApexTrigger"
+            ["pages"]="ApexPage"
+            ["components"]="AuraDefinitionBundle"
+            ["lwc"]="LightningComponentBundle"
+            ["objects"]="CustomObject"
+            ["layouts"]="Layout"
+            ["tabs"]="CustomTab"
+          )
+
+          for directory in "${!metadataMap[@]}"; do
+            METADATA_TYPE="${metadataMap[$directory]}"
+            
+            # Find modified or added files in each directory
+            MODIFIED_FILES=$(git diff --name-only --diff-filter=AM HEAD^ HEAD -- "$directory/*")
+            
+            if [ -n "$MODIFIED_FILES" ]; then
+              echo "  <types>" >> manifest/package.xml
+              for FILE in $MODIFIED_FILES; do
+                # Remove file extensions for metadata members
+                FILE_NAME=$(basename "$FILE" | sed 's/\.[^.]*$//')
+                echo "    <members>$FILE_NAME</members>" >> manifest/package.xml
+              done
+              echo "    <name>$METADATA_TYPE</name>" >> manifest/package.xml
+              echo "  </types>" >> manifest/package.xml
+            fi
+          done
+
+          echo '  <version>61.0</version>' >> manifest/package.xml
+          echo '</Package>' >> manifest/package.xml
+
+          cat manifest/package.xml
+
       - name: Auth to Salesforce Org
         run: |
             echo -e "${{ secrets[env.SERVER_KEY_SECRET] }}" > ./server.key
             sf org login jwt --client-id ${{ secrets[env.CLIENT_ID_SECRET] }} \
-            --jwt-key-file server.key \
-            --username ${{ env.ORG_USERNAME }} \
-            --alias ${{ env.ORG_ALIAS }}  --set-default
+              --jwt-key-file server.key \
+              --username ${{ env.ORG_USERNAME }} \
+              --alias ${{ env.ORG_ALIAS }} --set-default
 
-      - name: Deploying source code to Salesforce
+      - name: Deploy modified files
+        if: success() && steps.deploy.outputs.MODIFIED_FILES != ''
         run: |
-          sf project deploy start --source-dir force-app/main/default/ \
-          --target-org ${{ env.ORG_ALIAS }} \
-          --test-level RunLocalTests -c > deployResult.txt 
+          sf project deploy start --manifest manifest/package.xml \
+            --target-org ${{ env.ORG_ALIAS }} \
+            --test-level RunLocalTests -c > deployResult.txt
           cat deployResult.txt

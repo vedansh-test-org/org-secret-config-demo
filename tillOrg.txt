@@ -1,0 +1,54 @@
+name: Deploy Automation
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - sandbox
+      - prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cloning repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v3
+
+      - name: Installing sfdx cli
+        run: sudo npm install @salesforce/cli --global
+
+      - name: Reading Config File
+        run: |
+          ORG_ALIAS=$(grep ORG_ALIAS= config.txt | cut -d '=' -f2)
+          ORG_USERNAME=$(grep ORG_USERNAME= config.txt | cut -d '=' -f2)
+          
+          echo "ORG_ALIAS=$ORG_ALIAS" >> $GITHUB_ENV
+          echo "ORG_USERNAME=$ORG_USERNAME" >> $GITHUB_ENV
+
+      - name: Setting Secrets for Org
+        run: |
+          CLIENT_ID_SECRET="${ORG_ALIAS}_CLIENT_ID"
+          SERVER_KEY_SECRET="${ORG_ALIAS}_SERVER_KEY"
+          
+          echo "CLIENT_ID_SECRET=$CLIENT_ID_SECRET" >> $GITHUB_ENV
+          echo "SERVER_KEY_SECRET=$SERVER_KEY_SECRET" >> $GITHUB_ENV
+
+      - name: Auth to Salesforce Org
+        run: |
+            echo -e "${{ secrets[env.SERVER_KEY_SECRET] }}" > ./server.key
+            sf org login jwt --client-id ${{ secrets[env.CLIENT_ID_SECRET] }} \
+            --jwt-key-file server.key \
+            --username ${{ env.ORG_USERNAME }} \
+            --alias ${{ env.ORG_ALIAS }}  --set-default
+
+      - name: Deploying source code to Salesforce
+        run: |
+          sf project deploy start --source-dir force-app/main/default/ \
+          --target-org ${{ env.ORG_ALIAS }} \
+          --test-level RunLocalTests -c > deployResult.txt 
+          cat deployResult.txt
