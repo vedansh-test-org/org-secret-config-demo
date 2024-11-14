@@ -44,11 +44,18 @@ jobs:
             sf org login jwt --client-id ${{ secrets[env.CLIENT_ID_SECRET] }} \
             --jwt-key-file server.key \
             --username ${{ env.ORG_USERNAME }} \
-            --alias ${{ env.ORG_ALIAS }}  --set-default
+            --alias ${{ env.ORG_ALIAS }} --set-default
 
-      - name: Deploying source code to Salesforce
+      - name: Reading test classes from config file
+        run: |
+          TEST_CLASSES=$(awk 'NF' tests.txt | paste -sd "," -)
+          echo "TEST_CLASSES=$TEST_CLASSES" >> $GITHUB_ENV
+
+      - name: Deploying source code to Salesforce with specified tests
         run: |
           sf project deploy start --source-dir force-app/main/default/ \
           --target-org ${{ env.ORG_ALIAS }} \
-          --test-level RunLocalTests -c > deployResult.txt 
+          --test-level RunSpecifiedTests \
+          --tests ${{ env.TEST_CLASSES }} \
+          -c > deployResult.txt
           cat deployResult.txt
