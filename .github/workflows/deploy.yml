@@ -46,16 +46,15 @@ jobs:
             --username ${{ env.ORG_USERNAME }} \
             --alias ${{ env.ORG_ALIAS }} --set-default
 
-      - name: Reading test classes from file
+      - name: Reading test classes from config file
         run: |
-          TEST_FLAGS=$(awk '{print "--tests "$0}' tests.txt | paste -sd " " -)
-          echo "$TEST_FLAGS"
-          echo "TEST_FLAGS=$TEST_FLAGS" >> $GITHUB_ENV
-
+          TEST_CLASSES=$(awk 'NF' tests.txt | paste -sd " " -)
+          echo "TEST_CLASSES=$TEST_CLASSES" >> $GITHUB_ENV
       - name: Deploying source code to Salesforce with specified tests
         run: |
           sf project deploy start --source-dir force-app/main/default/ \
           --target-org ${{ env.ORG_ALIAS }} \
           --test-level RunSpecifiedTests \
-          ${{ env.TEST_FLAGS }} -c > deployResult.txt
+          --t ${{ env.TEST_CLASSES }} -c > deployResult.txt
+          
           cat deployResult.txt
