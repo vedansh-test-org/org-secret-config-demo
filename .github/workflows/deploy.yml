@@ -55,6 +55,6 @@ jobs:
           sf project deploy start --source-dir force-app/main/default/ \
           --target-org ${{ env.ORG_ALIAS }} \
           --test-level RunSpecifiedTests \
-          --t ${{ env.TEST_CLASSES }} -c > deployResult.txt
-          
+          -t ${{ env.TEST_CLASSES }} -c > deployResult.txt
+
           cat deployResult.txt
