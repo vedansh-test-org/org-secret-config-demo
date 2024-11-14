@@ -48,8 +48,8 @@ jobs:
 
       - name: Reading test classes from file
         run: |
-          # Read the test classes from tests.txt and format them into multiple --tests flags
           TEST_FLAGS=$(awk '{print "--tests "$0}' tests.txt | paste -sd " " -)
+          echo "$TEST_FLAGS"
           echo "TEST_FLAGS=$TEST_FLAGS" >> $GITHUB_ENV
 
       - name: Deploying source code to Salesforce with specified tests
@@ -57,6 +57,5 @@ jobs:
           sf project deploy start --source-dir force-app/main/default/ \
           --target-org ${{ env.ORG_ALIAS }} \
           --test-level RunSpecifiedTests \
-          ${{ env.TEST_FLAGS }} \
-          -c > deployResult.txt
+          ${{ env.TEST_FLAGS }} -c > deployResult.txt
           cat deployResult.txt
